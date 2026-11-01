@@ -81,6 +81,7 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     final = messenger.edits[-1][1] if messenger.edits else messenger.texts[-1]
     assert "✅" in final and "sent" in final and "archive" not in final and "inside" not in final
 
+    assert [m for m in messenger.texts if "#1" in m] == ["🕒 #1 v2rayNG_2.0.0.apk\nQueued"]  # one message per job, edited later
     await say("/downloads")
     assert "#1" in messenger.texts[-1] and "done" in messenger.texts[-1]
     await say("/status")

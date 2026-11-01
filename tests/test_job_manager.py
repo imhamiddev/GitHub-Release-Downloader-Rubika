@@ -215,4 +215,29 @@ async def test_recovery_restarts_interrupted_download(tmp_path, transport, messe
     await recover_jobs(db, mgr)
     await mgr.wait(job.id)
     assert (await db.get_job(job.id)).status == "done" and len(messenger.files) == 1
-    assert list(unzip_all([messenger.files[0][2]]).values()) == [DATA]
+    assert list(unzip_all([messenger.files[0][2]], caption_password(messenger.files[0][1])).values()) == [DATA]
+
+
+@pytest.mark.anyio
+async def test_each_job_gets_a_different_random_password_and_names(tmp_path, transport, messenger):
+    _, db, mgr = await build(tmp_path, transport, messenger)
+    for key in ("7", "8"):
+        transport.add_stream(stream())
+        job, _ = await mgr.submit(REF, "v1", entry(key=key))
+        await mgr.wait(job.id)
+    (p1, c1, _), (p2, c2, _) = messenger.files
+    assert caption_password(c1) != caption_password(c2)
+    assert Path(p1).name != Path(p2).name
+
+
+@pytest.mark.anyio
+async def test_password_survives_restart_and_is_reused(tmp_path, transport, messenger):
+    c, db, mgr = await build(tmp_path, transport, messenger)
+    f = c.download_dir / "job-1" / "alias"
+    f.parent.mkdir(parents=True)
+    f.write_bytes(DATA)
+    job, _ = await db.create_job(repo="o/r", tag="v1", asset_key="7", name="app.apk", size=len(DATA), url="https://api.github.com/x", digest=None)
+    await db.update_job(job.id, status="verifying", local_path=str(f), alias="alias", password="FixedPassword12A")
+    await recover_jobs(db, mgr)
+    await mgr.wait(job.id)
+    assert caption_password(messenger.files[0][1]) == "FixedPassword12A"

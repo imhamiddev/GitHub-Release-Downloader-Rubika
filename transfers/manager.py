@@ -261,12 +261,7 @@ class JobManager:
         password = job.password or random_password()
         if not job.password:
             await self.db.update_job(job.id, password=password)  # keep it for captions after a restart
-        await self._status(
-            job,
-            f"🗜 #{job.id} {fmt.md_safe(job.name)}\nCreating an encrypted "
-            f"{'multi-part ZIP (' + str(self.cfg.part_size_mb) + ' MB parts)' if split else 'ZIP'}…",
-            force=True,
-        )
+        await self._status(job, fmt.status_text("🗜", job, "Packing…"), force=True)
         self._check_capacity(size, 1.05)  # the original is already on disk; the ZIP needs one more copy
         parts_dir = self.job_dir(job.id) / "zip"
         remove_quietly(parts_dir)  # leftovers of an interrupted attempt

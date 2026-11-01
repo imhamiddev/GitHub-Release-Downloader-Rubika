@@ -357,16 +357,9 @@ class JobManager:
         await self.db.update_job(job.id, status="done", error=None, send_inflight=None, local_path=None)
         remove_quietly(self.job_dir(job.id))
         total = len(job.parts) or 1
-        extra = f" in {total} parts" if total > 1 else ""
-        first = Path(job.parts[0]["path"]).name if job.parts else "?"
-        base = first.rsplit(".", 1)[0] + ".zip" if first.rsplit(".", 1)[-1].isdigit() else first
-        await self._status(
-            job,
-            f"✅ #{job.id} delivered{extra}\n"
-            f"📦 archive: {base}{'.001…' if total > 1 else ''}\n"
-            f"📄 inside: {job.alias or '?'}  ⇒ original name: {fmt.md_safe(job.name)}",
-            force=True,
-        )
+        size = fmt.format_size(job.bytes_done or job.size) if (job.bytes_done or job.size) else ""
+        detail = " · ".join(x for x in (size, f"{total} parts" if total > 1 else "", "sent") if x)
+        await self._status(job, fmt.status_text("✅", job, detail), final=True)
         self._status_msg.pop(job.id, None)
 
     async def _fail(self, job_id: int, reason: str) -> None:

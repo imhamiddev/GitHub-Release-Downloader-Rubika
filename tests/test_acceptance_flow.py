@@ -14,7 +14,7 @@ from rubika.message_listener import IncomingMessage
 from rubika.saved_messages import SavedMessages
 from storage.cache import TTLCache
 from storage.database import Database
-from tests.conftest import FakeStream, no_sleep
+from tests.conftest import FakeStream, no_sleep, unzip_all
 from transfers.downloader import Downloader
 from transfers.manager import JobManager
 
@@ -39,7 +39,7 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     await db.init()
     gh = GitHubClient(transport, None, TTLCache(300), sleep=no_sleep)
     chat = SavedMessages(messenger)
-    jobs = JobManager(cfg, db, Downloader(gh, 1, 0, no_sleep), messenger, chat, None, sleep=no_sleep)
+    jobs = JobManager(cfg, db, Downloader(gh, 1, 0, no_sleep), messenger, chat, sleep=no_sleep)
     ctx = Context(cfg, db, gh, RepositoryService(gh), ReleaseService(gh), jobs, chat)
     h = CommandHandler(ctx)
 
@@ -70,7 +70,8 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     transport.add_stream(FakeStream(200, {"content-length": str(len(APK))}, [APK]))
     await say("/asset 1")
     await jobs.wait(1)
-    assert messenger.files[0][2] == APK
+    assert list(unzip_all([messenger.files[0][2]]).values()) == [APK]
+    assert "v2rayNG" not in messenger.files[0][0]
     assert "delivered" in (messenger.edits[-1][1] if messenger.edits else messenger.texts[-1])
 
     await say("/downloads")
@@ -86,7 +87,7 @@ async def test_errors_are_reported_not_raised(tmp_path, transport, messenger):
     await db.init()
     gh = GitHubClient(transport, None, TTLCache(300), sleep=no_sleep)
     chat = SavedMessages(messenger)
-    jobs = JobManager(cfg, db, Downloader(gh), messenger, chat, None, sleep=no_sleep)
+    jobs = JobManager(cfg, db, Downloader(gh), messenger, chat, sleep=no_sleep)
     h = CommandHandler(Context(cfg, db, gh, RepositoryService(gh), ReleaseService(gh), jobs, chat))
     for i, text in enumerate(["/get https://evil.com/a/b", "/asset 1", "/open 3", "/nope", "/page x", "/back"]):
         await h.handle(IncomingMessage(f"e{i}", "me-guid", "me-guid", text))

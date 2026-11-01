@@ -274,12 +274,11 @@ class JobManager:
         return await self.db.get_job(job.id)
 
     def _caption(self, job: Job, index: int, total: int) -> str:
-        """No name, repo, tag or hash: only a job number (look it up with /downloads)."""
-        lines = [f"🗜 #{job.id}"]
-        if total > 1:
-            lines[0] += f" · part {index + 1}/{total}"
-            if index == 0:
-                lines.append("ℹ️ put all parts in one folder and open the .001 file with 7-Zip/WinRAR")
+        """No name, repo, tag or hash: a job number and the archive password (look the file up with /downloads)."""
+        head = f"🗜 #{job.id}" + (f" · part {index + 1}/{total}" if total > 1 else "")
+        lines = [head, f"🔑 password: `{job.password}`"]
+        if total > 1 and index == 0:
+            lines.append("ℹ️ put all parts in one folder and open the .001 file with 7-Zip/WinRAR")
         return "\n".join(lines)
 
     async def _send_stage(self, job: Job, cancel: asyncio.Event) -> Job:

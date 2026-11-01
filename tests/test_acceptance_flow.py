@@ -83,7 +83,7 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     await say("/downloads")
     assert "#1" in messenger.texts[-1] and "done" in messenger.texts[-1]
     await say("/status")
-    assert "running" in messenger.texts[-1]
+    assert "Running" in messenger.texts[-1] and "Forks" not in messenger.texts[-1]
 
 
 @pytest.mark.anyio

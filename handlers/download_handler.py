@@ -78,12 +78,10 @@ async def cmd_status(ctx: Context, args: List[str]) -> None:
     rate_txt = "n/a" if rate.remaining is None else f"{rate.remaining}/{rate.limit}"
     up = int(time.time() - ctx.started_at)
     lines = [
-        "🟢 GitHub Release Downloader is running",
-        f"⏱ Uptime: {up // 3600}h {(up % 3600) // 60}m",
-        f"📥 Active downloads: {active} (max {cfg.max_concurrent_downloads} at once)",
-        f"💾 Storage used: {fmt.format_size(used)} of {cfg.max_storage_mb} MB quota · free disk {fmt.format_size(free)}",
-        f"🐙 GitHub API: {'token set' if ctx.github.has_token else 'no token (60 req/h)'} · remaining {rate_txt}",
-        f"🗜 Every file is sent as a password-protected ZIP (random name, random password per file); above {cfg.split_threshold_mb} MB it is cut into {cfg.part_size_mb} MB parts",
+        f"🟢 Running · up {up // 3600}h {(up % 3600) // 60}m",
+        f"📥 Active downloads: {active}/{cfg.max_concurrent_downloads}",
+        f"💾 Storage: {fmt.format_size(used)} used of {cfg.max_storage_mb} MB · {fmt.format_size(free)} free",
+        f"🐙 GitHub API: {'token' if ctx.github.has_token else 'no token'} · {rate_txt} requests left",
     ]
     await ctx.chat.reply("\n".join(lines))
 

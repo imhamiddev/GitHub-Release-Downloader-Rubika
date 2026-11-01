@@ -100,3 +100,18 @@ class FakeMessenger:
 @pytest.fixture
 def messenger():
     return FakeMessenger()
+
+
+def unzip_all(parts_bytes):
+    """Join delivered volumes and return {member name: bytes} (what 7-Zip does with .zip.001)."""
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(b"".join(parts_bytes))) as zf:
+        return {n: zf.read(n) for n in zf.namelist()}
+
+
+def is_random_name(name):
+    import re
+
+    return re.fullmatch(r"[0-9a-f]{20}(\.zip(\.\d{3})?)?", name) is not None

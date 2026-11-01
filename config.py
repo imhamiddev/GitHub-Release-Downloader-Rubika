@@ -42,7 +42,6 @@ class Config:
     page_size: int = 5
     max_retries: int = 5
     send_delay_seconds: int = 3
-    sevenzip_bin: Optional[str] = None
 
     @property
     def max_download_bytes(self) -> int:
@@ -78,6 +77,5 @@ class Config:
             page_size=_int(env, "PAGE_SIZE", 5, 1),
             max_retries=_int(env, "MAX_RETRIES", 5, 0),
             send_delay_seconds=_int(env, "SEND_DELAY_SECONDS", 3, 0),
-            sevenzip_bin=(env.get("SEVENZIP_BIN") or "").strip() or None,
         )
         return cfg

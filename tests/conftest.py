@@ -139,12 +139,15 @@ def messenger():
     return FakeMessenger()
 
 
-def unzip_all(parts_bytes):
+def unzip_all(parts_bytes, password=None):
     """Join delivered volumes and return {member name: bytes} (what 7-Zip does with .zip.001)."""
     import io
-    import zipfile
 
-    with zipfile.ZipFile(io.BytesIO(b"".join(parts_bytes))) as zf:
+    import pyzipper
+
+    with pyzipper.AESZipFile(io.BytesIO(b"".join(parts_bytes))) as zf:
+        if password is not None:
+            zf.setpassword(password.encode())
         return {n: zf.read(n) for n in zf.namelist()}
 
 

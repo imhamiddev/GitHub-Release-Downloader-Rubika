@@ -26,6 +26,8 @@ COMMANDS: Dict[str, Handler] = {
     "page": rl.cmd_page,
     "filter": rl.cmd_filter,
     "back": rl.cmd_back,
+    "notes": rl.cmd_notes,
+    "extras": rl.cmd_extras,
     "asset": dl.cmd_asset,
     "download": dl.cmd_download,
     "downloads": dl.cmd_downloads,

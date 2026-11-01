@@ -37,7 +37,12 @@ def test_random_names_are_unique_and_meaningless():
     assert len(names) == 200 and all(is_random_name(n) for n in names)
 
 
-def test_single_zip_stores_file_under_given_member_name(tmp_path):
+def test_random_passwords_are_unique_alphanumeric():
+    pws = {random_password() for _ in range(200)}
+    assert len(pws) == 200 and all(len(p) == 16 and p.isalnum() for p in pws)
+
+
+def test_zip_is_built_with_aes256_password_and_member_name(tmp_path):
     src = tmp_path / "real-name.apk"
     src.write_bytes(b"payload" * 100)
     paths = zip_to_volumes(src, tmp_path / "out", "abc123", "scrambled", None)

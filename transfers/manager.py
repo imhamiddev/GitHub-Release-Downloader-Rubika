@@ -30,7 +30,15 @@ from storage.database import Database, Job
 from transfers.downloader import Downloader
 from transfers.verifier import verify_sha256, verify_size
 from utils import formatting as fmt
-from utils.file_utils import dir_size, free_bytes, random_name, remove_quietly, zip_to_volumes
+from utils.file_utils import (
+    create_encrypted_zip,
+    dir_size,
+    free_bytes,
+    random_name,
+    random_password,
+    remove_quietly,
+    split_into_volumes,
+)
 
 log = logging.getLogger(__name__)
 

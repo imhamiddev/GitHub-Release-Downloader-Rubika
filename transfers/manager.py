@@ -375,4 +375,4 @@ class JobManager:
         await self.db.update_job(job_id, status="cancelled", error=None)
         remove_quietly(self.job_dir(job_id))
         if job:
-            await self._status(job, f"🚫 #{job_id} {fmt.md_safe(job.name)} cancelled.", force=True)
+            await self._status(job, fmt.status_text("🚫", job, "Cancelled"), final=True)

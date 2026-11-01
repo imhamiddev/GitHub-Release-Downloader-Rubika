@@ -187,7 +187,7 @@ def help_text() -> str:
         "/retry ID — resume a failed download\n\n"
         "Other\n"
         "/status — server status and storage · /help\n\n"
-        "🗜 Every file arrives as a ZIP with a random name (several parts if big)."
+        "🗜 Every file arrives as an AES-256 ZIP with a random name; its password is in the caption (several parts if big)."
     )
 
 

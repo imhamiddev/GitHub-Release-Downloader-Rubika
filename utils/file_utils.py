@@ -1,16 +1,15 @@
 """Filesystem helpers: safe names, disk usage, atomic writes and file splitting."""
 from __future__ import annotations
 
-import asyncio
-import glob
 import os
 import re
+import secrets
 import shutil
-from dataclasses import dataclass
+import zipfile
 from pathlib import Path
 from typing import List, Optional
 
-from errors import DownloadError, JobCancelled
+from errors import JobCancelled
 
 _BAD_CHARS = re.compile(r"[^\w.\-+() ]", re.UNICODE)
 
@@ -66,101 +65,86 @@ def atomic_write_text(path: Path, text: str, mode: int = 0o600) -> None:
     os.replace(tmp, path)
 
 
-def find_sevenzip(explicit: Optional[str] = None) -> Optional[str]:
-    candidates = [explicit or "", "7za", "7z", "7zz", "/usr/bin/7za", "/usr/local/bin/7za"]
-    for c in candidates:
-        if not c:
-            continue
-        if os.path.isabs(c):
-            if os.path.isfile(c) and os.access(c, os.X_OK):
-                return c
-        else:
-            found = shutil.which(c)
-            if found:
-                return found
-    return None
+def random_name(nbytes: int = 10) -> str:
+    """Unguessable, meaningless name (20 hex chars) used for the downloaded file and the archive."""
+    return secrets.token_hex(nbytes)
 
 
-@dataclass
-class SplitResult:
-    parts: List[Path]
-    method: str  # "7z" or "raw"
+class VolumeWriter:
+    """Write-only, non-seekable stream that rolls over into ``<base>.001``, ``.002`` ... volumes.
+
+    Handing it to ``zipfile.ZipFile`` produces a normal ZIP that is already cut into raw
+    volumes, which 7-Zip / WinRAR open from the ``.001`` file. Peak disk use is the volumes only.
+    """
+
+    def __init__(self, base: Path, part_bytes: Optional[int], cancel=None):
+        self.base, self.part_bytes, self._cancel = base, part_bytes, cancel
+        self.paths: List[Path] = []
+        self._fh = None
+        self._in_part = 0
+        self._pos = 0
+
+    def _open_next(self) -> None:
+        if self._fh:
+            self._fh.close()
+        path = self.base if self.part_bytes is None else self.base.with_name(f"{self.base.name}.{len(self.paths) + 1:03d}")
+        self._fh = open(path, "wb")
+        self.paths.append(path)
+        self._in_part = 0
+
+    def write(self, data) -> int:
+        if self._cancel is not None and self._cancel.is_set():
+            raise JobCancelled("cancelled")
+        view = memoryview(data)
+        total = len(view)
+        offset = 0
+        while offset < total:
+            if self._fh is None or (self.part_bytes is not None and self._in_part >= self.part_bytes):
+                self._open_next()
+            room = (total - offset) if self.part_bytes is None else min(total - offset, self.part_bytes - self._in_part)
+            self._fh.write(view[offset : offset + room])
+            self._in_part += room
+            offset += room
+        self._pos += total
+        return total
+
+    def tell(self) -> int:
+        return self._pos
+
+    def flush(self) -> None:
+        if self._fh:
+            self._fh.flush()
+
+    def close(self) -> None:
+        if self._fh:
+            self._fh.flush()
+            os.fsync(self._fh.fileno())
+            self._fh.close()
+            self._fh = None
 
 
-async def _run_cancellable(cmd: List[str], cwd: Path, cancel: Optional[asyncio.Event]) -> int:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd, cwd=str(cwd), stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
-    )
-    try:
-        while True:
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=1)
-                break
-            except asyncio.TimeoutError:
-                if cancel is not None and cancel.is_set():
-                    proc.kill()
-                    await proc.wait()
-                    raise JobCancelled("cancelled")
-    except asyncio.CancelledError:
-        if proc.returncode is None:
-            proc.kill()
-        raise
-    return proc.returncode
+def zip_to_volumes(
+    src: Path, out_dir: Path, zip_base: str, arcname: str, part_bytes: Optional[int], cancel=None
+) -> List[Path]:
+    """Store ``src`` (no recompression) in a ZIP named ``<zip_base>.zip``, split into volumes if asked.
 
-
-def _raw_split(src: Path, out_dir: Path, part_bytes: int) -> List[Path]:
-    parts: List[Path] = []
-    with open(src, "rb") as fh:
-        index = 1
-        while True:
-            chunk_left = part_bytes
-            out = out_dir / f"{src.name}.part{index:03d}"
-            written = 0
-            with open(out, "wb") as dst:
-                while chunk_left > 0:
-                    data = fh.read(min(1024 * 1024, chunk_left))
-                    if not data:
-                        break
-                    dst.write(data)
-                    written += len(data)
-                    chunk_left -= len(data)
-            if written == 0:
-                out.unlink(missing_ok=True)
-                break
-            parts.append(out)
-            index += 1
-    return parts
-
-
-async def split_file(
-    src: Path,
-    out_dir: Path,
-    part_size_mb: int,
-    sevenzip_bin: Optional[str],
-    cancel: Optional[asyncio.Event] = None,
-) -> SplitResult:
-    """Split ``src`` into <= part_size_mb parts.
-
-    Uses ``7z a -mx=0 -vNm`` exactly like telegram-to-rubika (store-only, so no recompression);
-    falls back to a plain binary split when 7-Zip is not installed.
+    Returns the files to upload, in order: ``[x.zip]`` or ``[x.zip.001, x.zip.002, ...]``.
+    Runs blocking I/O: call it through ``asyncio.to_thread``.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    if sevenzip_bin:
-        base = out_dir / (src.name + ".7z")
-        for old in glob.glob(glob.escape(str(base)) + "*"):
-            remove_quietly(old)
-        cmd = [sevenzip_bin, "a", "-mx=0", "-bsp0", "-bso0", f"-v{part_size_mb}m", str(base), "--", src.name]
-        rc = await _run_cancellable(cmd, src.parent, cancel)
-        parts = sorted(Path(p) for p in glob.glob(glob.escape(str(base)) + ".*"))
-        if not parts and base.exists():
-            parts = [base]
-        if rc not in (0, 1) or not parts:
-            for p in parts:
-                remove_quietly(p)
-            raise DownloadError("7-Zip failed to split the file")
-        return SplitResult(parts, "7z")
-    loop = asyncio.get_running_loop()
-    parts = await loop.run_in_executor(None, _raw_split, src, out_dir, part_size_mb * 1024 * 1024)
-    if not parts:
-        raise DownloadError("could not split the file")
-    return SplitResult(parts, "raw")
+    base = out_dir / f"{zip_base}.zip"
+    writer = VolumeWriter(base, part_bytes, cancel)
+    try:
+        with zipfile.ZipFile(writer, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as zf:
+            zf.write(src, arcname=arcname, compress_type=zipfile.ZIP_STORED)
+        writer.close()
+    except BaseException:
+        writer.close()
+        for p in writer.paths:
+            remove_quietly(p)
+        raise
+    paths = writer.paths
+    if part_bytes is not None and len(paths) == 1:  # fit in one volume: plain .zip
+        paths[0].rename(base)
+        paths = [base]
+    return paths

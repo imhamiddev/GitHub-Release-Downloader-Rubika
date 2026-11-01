@@ -323,10 +323,8 @@ class JobManager:
                 pct = sent * 100 // max(total_bytes, 1)
                 if pct - last_pct >= 10:
                     last_pct = pct
-                    await self._status(
-                        _job,
-                        f"📤 #{_job.id} {fmt.md_safe(_job.name)}\nPart {index + 1}/{total}: {fmt.progress_bar(sent, total_bytes)}",
-                    )
+                    prefix = f"Part {index + 1}/{total} · " if total > 1 else ""
+                    await self._status(_job, fmt.status_text("📤", _job, prefix + fmt.progress_bar(sent, total_bytes)))
 
             upload = asyncio.create_task(self.messenger.send_file(str(path), caption, progress))
             try:

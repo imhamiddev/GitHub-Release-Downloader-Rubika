@@ -27,7 +27,6 @@ from storage.database import Database
 from transfers.downloader import Downloader
 from transfers.manager import JobManager
 from transfers.recovery import recover_jobs
-from utils.file_utils import find_sevenzip
 from utils.logging_utils import setup_logging
 
 log = logging.getLogger("github-bridge")
@@ -43,10 +42,7 @@ async def run(cfg: Config) -> None:
     github = GitHubClient(transport, cfg.github_token, TTLCache(cfg.cache_ttl))
     messenger = RubpyMessenger(cfg)
     chat = SavedMessages(messenger)
-    sevenzip = find_sevenzip(cfg.sevenzip_bin)
-    if sevenzip is None:
-        log.warning("7-Zip not found; files above %s MB will use a plain binary split", cfg.split_threshold_mb)
-    jobs = JobManager(cfg, db, Downloader(github, cfg.max_retries), messenger, chat, sevenzip)
+    jobs = JobManager(cfg, db, Downloader(github, cfg.max_retries), messenger, chat)
     ctx = Context(cfg, db, github, RepositoryService(github), ReleaseService(github), jobs, chat)
     listener = MessageListener(messenger, db, CommandHandler(ctx).handle)
 

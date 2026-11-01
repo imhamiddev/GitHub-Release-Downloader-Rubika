@@ -83,7 +83,7 @@ async def cmd_status(ctx: Context, args: List[str]) -> None:
         f"📥 Active downloads: {active} (max {cfg.max_concurrent_downloads} at once)",
         f"💾 Storage used: {fmt.format_size(used)} of {cfg.max_storage_mb} MB quota · free disk {fmt.format_size(free)}",
         f"🐙 GitHub API: {'token set' if ctx.github.has_token else 'no token (60 req/h)'} · remaining {rate_txt}",
-        f"✂️ Split: {'7-Zip' if ctx.jobs.sevenzip_bin else 'plain binary split (7-Zip not found)'} above {cfg.split_threshold_mb} MB",
+        f"🗜 Every file is sent as a ZIP with a random name; above {cfg.split_threshold_mb} MB it is cut into {cfg.part_size_mb} MB parts",
     ]
     await ctx.chat.reply("\n".join(lines))
 

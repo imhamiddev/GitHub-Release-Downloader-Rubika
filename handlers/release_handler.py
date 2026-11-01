@@ -97,6 +97,20 @@ async def cmd_filter(ctx: Context, args: List[str]) -> None:
     await show_release_page(ctx, 1)
 
 
+async def cmd_notes(ctx: Context, args: List[str]) -> None:
+    if ctx.nav.release is None:
+        raise InvalidInput("Open a release first: /open N or /latest owner/repo")
+    await ctx.chat.reply(fmt.release_notes_text(ctx.nav.release))
+
+
+async def cmd_extras(ctx: Context, args: List[str]) -> None:
+    """Toggle signature / checksum files in the file list (numbers change, so the list is re-sent)."""
+    if ctx.nav.release is None:
+        raise InvalidInput("Open a release first: /open N or /latest owner/repo")
+    ctx.nav.show_extras = not ctx.nav.show_extras
+    await show_release(ctx, ctx.nav.release)
+
+
 async def cmd_back(ctx: Context, args: List[str]) -> None:
     nav = ctx.nav
     if nav.release is not None and nav.items:

@@ -24,11 +24,11 @@ async def _queue(ctx: Context, selectors: List[str]) -> None:
         except BridgeError as exc:
             lines.append(f"❌ {fmt.md_safe(entry.name)}: {fmt.md_safe(str(exc))}")
             continue
-        if created:
-            lines.append(f"🕒 #{job.id} queued: {fmt.md_safe(entry.name)}")
-        else:
-            lines.append(f"↩️ #{job.id} {fmt.md_safe(entry.name)} is already {job.status} — not queued again")
-    await ctx.chat.reply("\n".join(lines))
+        if not created:
+            lines.append(f"↩️ #{job.id} {fmt.md_safe(entry.name)} is already {job.status}")
+        # a new job needs no reply here: its own status message ("🕒 #N … Queued") appears right away
+    if lines:
+        await ctx.chat.reply("\n".join(lines))
 
 
 async def cmd_asset(ctx: Context, args: List[str]) -> None:

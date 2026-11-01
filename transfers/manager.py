@@ -238,7 +238,7 @@ class JobManager:
         return await self.db.get_job(job.id)
 
     async def _prepare_stage(self, job: Job, cancel: asyncio.Event) -> Job:
-        """Always wrap the download in a ZIP with a random name; big files become several volumes."""
+        """Always wrap the download in a password-protected ZIP with a random name; big files get volumes."""
         src = Path(job.local_path or "")
         if not src.exists():
             raise DownloadError("the downloaded file disappeared from disk; use /retry")

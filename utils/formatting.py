@@ -225,23 +225,16 @@ def job_line(job) -> str:
 
 def help_text() -> str:
     return (
-        "📖 GitHub Release Downloader — commands (send them here, in Saved Messages)\n\n"
-        "Browse\n"
-        "/get owner/repo — repository info + releases\n"
-        "/releases owner/repo [stable|all] — browse all releases\n"
+        "📖 Commands\n\n"
+        "/get owner/repo — repo + its releases\n"
         "/latest owner/repo — latest stable release\n"
-        "/release owner/repo tag — open a release (or /release tag inside a repo)\n"
-        "/open N — open item N of the current list\n"
-        "/page N — go to page N · /filter stable|all · /back\n\n"
-        "Download\n"
-        "/asset 1 3 — download assets by number (zip / tar = source archives)\n"
-        "/download ID — download by GitHub asset ID\n"
-        "/downloads — active and recent downloads\n"
-        "/cancel [ID] — cancel one download (no ID: everything active)\n"
-        "/retry ID — resume a failed download\n\n"
-        "Other\n"
-        "/status — server status and storage · /help\n\n"
-        "🗜 Every file arrives as an AES-256 ZIP with a random name; its password is in the caption (several parts if big)."
+        "/release owner/repo tag — open one release\n"
+        "/open N · /page N · /filter stable|all · /back\n\n"
+        "/asset 1 3 — download files by number (zip / tar = source code)\n"
+        "/notes — changelog · /extras — show/hide signatures\n\n"
+        "/downloads · /cancel [ID] · /retry ID\n"
+        "/status · /help\n\n"
+        "🔑 Files arrive as encrypted ZIPs; the password is in each caption."
     )
 
 

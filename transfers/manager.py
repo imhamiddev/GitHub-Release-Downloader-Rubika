@@ -65,6 +65,7 @@ class JobManager:
         self._cancel: Dict[int, asyncio.Event] = {}
         self._status_msg: Dict[int, Optional[str]] = {}
         self._last_edit: Dict[int, float] = {}
+        self._edit_broken: set = set()  # jobs whose status message Rubika refused to edit
 
     # ---- helpers ---------------------------------------------------------------
     def job_dir(self, job_id: int) -> Path:
@@ -74,13 +75,23 @@ class JobManager:
         t = self._tasks.get(job_id)
         return bool(t and not t.done())
 
-    async def _status(self, job: Job, text: str, force: bool = False) -> None:
+    async def _status(self, job: Job, text: str, force: bool = False, final: bool = False) -> None:
+        """Keep ONE status message per job and edit it in place.
+
+        If Rubika will not edit it, later progress is dropped instead of flooding the chat with a
+        new message per update; only a ``final`` update (done / failed / cancelled) is sent as new.
+        """
         now = self._clock()
-        if not force and now - self._last_edit.get(job.id, 0.0) < PROGRESS_INTERVAL:
+        if not (force or final) and now - self._last_edit.get(job.id, 0.0) < PROGRESS_INTERVAL:
             return
         self._last_edit[job.id] = now
         mid = self._status_msg.get(job.id)
-        if mid and await self.chat.edit(mid, text):
+        if mid and job.id not in self._edit_broken:
+            if await self.chat.edit(mid, text):
+                return
+            self._edit_broken.add(job.id)
+            log.warning("job %s: Rubika refused to edit the status message; further progress will not be shown", job.id)
+        if mid and not final:
             return
         self._status_msg[job.id] = await self.chat.reply(text)
 
@@ -119,6 +130,8 @@ class JobManager:
         if self.is_running(job_id):
             return
         self._cancel[job_id] = asyncio.Event()
+        self._status_msg.pop(job_id, None)  # every (re)start gets its own status message
+        self._edit_broken.discard(job_id)
         task = asyncio.create_task(self._run(job_id), name=f"job-{job_id}")
         self._tasks[job_id] = task
 

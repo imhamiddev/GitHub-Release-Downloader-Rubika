@@ -14,7 +14,7 @@ from storage.cache import TTLCache
 from storage.database import Database
 from pathlib import Path
 
-from tests.conftest import FakeStream, is_random_name, no_sleep, unzip_all
+from tests.conftest import FakeStream, caption_password, is_random_name, no_sleep, unzip_all
 from transfers.downloader import Downloader
 from transfers.manager import JobManager
 from transfers.recovery import recover_jobs

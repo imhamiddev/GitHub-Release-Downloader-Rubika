@@ -28,9 +28,11 @@ async def show_release_page(ctx: Context, page: int, header: Optional[str] = Non
 
 
 async def show_release(ctx: Context, rel: Release) -> None:
-    ctx.nav.release = rel
-    ctx.nav.listing = rel.listing(ctx.nav.repo)
-    await ctx.chat.reply(fmt.release_detail_text(ctx.nav.repo.full_name, rel, ctx.nav.listing))
+    nav = ctx.nav
+    nav.release = rel
+    nav.listing = rel.listing(nav.repo, include_extras=nav.show_extras)
+    hidden = 0 if nav.show_extras else rel.extras_count
+    await ctx.chat.reply(fmt.release_detail_text(nav.repo.full_name, rel, nav.listing, hidden, nav.show_extras))
 
 
 async def cmd_releases(ctx: Context, args: List[str]) -> None:

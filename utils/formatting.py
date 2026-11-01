@@ -45,12 +45,29 @@ def format_date(iso: Optional[str]) -> str:
         return iso
 
 
-def progress_bar(done: int, total: Optional[int], width: int = 12) -> str:
+def format_day(iso: Optional[str]) -> str:
+    """Date only (2026-11-01): the time of day and the timezone are noise in a release list."""
+    if not iso:
+        return "unknown date"
+    return iso[:10] if re.match(r"\d{4}-\d{2}-\d{2}", iso) else iso
+
+
+def format_count(n: Optional[int]) -> str:
+    """65128 -> 65.1k, 1234567 -> 1.2M."""
+    n = int(n or 0)
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k"
+    return str(n)
+
+
+def progress_bar(done: int, total: Optional[int], width: int = 10) -> str:
     if not total:
         return f"{format_size(done)}"
     frac = max(0.0, min(1.0, done / total))
     filled = int(frac * width)
-    return f"[{'█' * filled}{'░' * (width - filled)}] {frac * 100:.0f}% ({format_size(done)}/{format_size(total)})"
+    return f"{'█' * filled}{'░' * (width - filled)} {frac * 100:.0f}% · {format_size(done)} / {format_size(total)}"
 
 
 def truncate(text: str, limit: int) -> str:

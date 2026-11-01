@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     send_inflight INTEGER,
     split_method TEXT,
     alias TEXT,
+    password TEXT,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );

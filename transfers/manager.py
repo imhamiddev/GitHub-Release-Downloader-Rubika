@@ -30,7 +30,7 @@ from storage.database import Database, Job
 from transfers.downloader import Downloader
 from transfers.verifier import verify_sha256, verify_size
 from utils import formatting as fmt
-from utils.file_utils import dir_size, free_bytes, remove_quietly, safe_filename, split_file
+from utils.file_utils import dir_size, free_bytes, random_name, remove_quietly, zip_to_volumes
 
 log = logging.getLogger(__name__)
 
@@ -45,13 +45,11 @@ class JobManager:
         downloader: Downloader,
         messenger: Messenger,
         chat: SavedMessages,
-        sevenzip_bin: Optional[str] = None,
         sleep: Callable[[float], "asyncio.Future"] = asyncio.sleep,
         clock: Callable[[], float] = time.monotonic,
     ):
         self.cfg, self.db, self.downloader = cfg, db, downloader
         self.messenger, self.chat = messenger, chat
-        self.sevenzip_bin = sevenzip_bin
         self._sleep, self._clock = sleep, clock
         self._download_sem = asyncio.Semaphore(cfg.max_concurrent_downloads)
         self._send_lock = asyncio.Lock()  # one Rubika upload at a time
@@ -78,10 +76,9 @@ class JobManager:
             return
         self._status_msg[job.id] = await self.chat.reply(text)
 
-    def _check_capacity(self, expected: Optional[int]) -> None:
+    def _check_capacity(self, expected: Optional[int], factor: float = 2.1) -> None:
         cfg = self.cfg
         expected = expected or 0
-        factor = 2.05 if expected > cfg.split_threshold_mb * 1024 * 1024 else 1.05
         need = int(expected * factor)
         if free_bytes(cfg.download_dir) - need < cfg.min_free_mb * 1024 * 1024:
             raise QuotaExceeded("not enough free disk space for this download")
@@ -207,8 +204,9 @@ class JobManager:
         if cancel.is_set():
             raise JobCancelled("cancelled")
         self._check_capacity(job.size)
-        dest = self.job_dir(job.id) / safe_filename(job.name)
-        await self.db.update_job(job.id, status="downloading")
+        alias = job.alias or random_name()  # the file never exists on disk under its real name
+        dest = self.job_dir(job.id) / alias
+        await self.db.update_job(job.id, status="downloading", alias=alias)
         job = await self.db.get_job(job.id)
         await self._status(job, f"⬇️ #{job.id} {fmt.md_safe(job.name)}\nStarting download…", force=True)
 
@@ -232,41 +230,41 @@ class JobManager:
         return await self.db.get_job(job.id)
 
     async def _prepare_stage(self, job: Job, cancel: asyncio.Event) -> Job:
+        """Always wrap the download in a ZIP with a random name; big files become several volumes."""
         src = Path(job.local_path or "")
         if not src.exists():
             raise DownloadError("the downloaded file disappeared from disk; use /retry")
         size = src.stat().st_size
-        if size > self.cfg.split_threshold_mb * 1024 * 1024:
-            await self._status(job, f"✂️ #{job.id} {fmt.md_safe(job.name)}\nSplitting into {self.cfg.part_size_mb} MB parts…", force=True)
-            self._check_capacity(size)
-            parts_dir = self.job_dir(job.id) / "parts"
-            result = await split_file(src, parts_dir, self.cfg.part_size_mb, self.sevenzip_bin, cancel)
-            parts = [{"path": str(p), "size": p.stat().st_size} for p in result.parts]
-            # Persist the part list BEFORE deleting the original, so a crash loses nothing.
-            await self.db.update_job(
-                job.id, parts_json=json.dumps(parts), parts_sent=0, send_inflight=None,
-                split_method=result.method, status="sending",
-            )
-            remove_quietly(src)
-        else:
-            parts = [{"path": str(src), "size": size}]
-            await self.db.update_job(
-                job.id, parts_json=json.dumps(parts), parts_sent=0, send_inflight=None,
-                split_method="none", status="sending",
-            )
+        split = size > self.cfg.split_threshold_mb * 1024 * 1024
+        await self._status(
+            job,
+            f"🗜 #{job.id} {fmt.md_safe(job.name)}\nCreating {'a multi-part ZIP (' + str(self.cfg.part_size_mb) + ' MB parts)' if split else 'a ZIP'}…",
+            force=True,
+        )
+        self._check_capacity(size, 1.05)  # the original is already on disk; the ZIP needs one more copy
+        parts_dir = self.job_dir(job.id) / "zip"
+        remove_quietly(parts_dir)  # leftovers of an interrupted attempt
+        arcname = job.alias or src.name
+        paths = await asyncio.to_thread(
+            zip_to_volumes, src, parts_dir, random_name(), arcname,
+            self.cfg.part_size_mb * 1024 * 1024 if split else None, cancel,
+        )
+        parts = [{"path": str(p), "size": p.stat().st_size} for p in paths]
+        # Persist the part list BEFORE deleting the original, so a crash loses nothing.
+        await self.db.update_job(
+            job.id, parts_json=json.dumps(parts), parts_sent=0, send_inflight=None,
+            split_method="zip-volumes" if len(parts) > 1 else "zip", status="sending",
+        )
+        remove_quietly(src)
         return await self.db.get_job(job.id)
 
     def _caption(self, job: Job, index: int, total: int) -> str:
-        lines = [f"📦 {job.name}", f"🔗 {job.repo} @ {job.tag}"]
-        if job.sha256:
-            lines.append(f"🔐 sha256: {job.sha256}")
+        """No name, repo, tag or hash: only a job number (look it up with /downloads)."""
+        lines = [f"🗜 #{job.id}"]
         if total > 1:
-            lines.append(f"🧩 part {index + 1}/{total}")
+            lines[0] += f" · part {index + 1}/{total}"
             if index == 0:
-                if job.split_method == "7z":
-                    lines.append("ℹ️ open the .7z.001 file with 7-Zip to extract")
-                else:
-                    lines.append("ℹ️ join the parts in order (cat / copy /b)")
+                lines.append("ℹ️ put all parts in one folder and open the .001 file with 7-Zip/WinRAR")
         return "\n".join(lines)
 
     async def _send_stage(self, job: Job, cancel: asyncio.Event) -> Job:
@@ -340,7 +338,15 @@ class JobManager:
         remove_quietly(self.job_dir(job.id))
         total = len(job.parts) or 1
         extra = f" in {total} parts" if total > 1 else ""
-        await self._status(job, f"✅ #{job.id} {fmt.md_safe(job.name)} delivered{extra} to Saved Messages.", force=True)
+        first = Path(job.parts[0]["path"]).name if job.parts else "?"
+        base = first.rsplit(".", 1)[0] + ".zip" if first.rsplit(".", 1)[-1].isdigit() else first
+        await self._status(
+            job,
+            f"✅ #{job.id} delivered{extra}\n"
+            f"📦 archive: {base}{'.001…' if total > 1 else ''}\n"
+            f"📄 inside: {job.alias or '?'}  ⇒ original name: {fmt.md_safe(job.name)}",
+            force=True,
+        )
         self._status_msg.pop(job.id, None)
 
     async def _fail(self, job_id: int, reason: str) -> None:

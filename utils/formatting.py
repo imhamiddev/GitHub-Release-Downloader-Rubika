@@ -93,17 +93,15 @@ def flags(rel: Release) -> str:
 
 
 def repo_info_text(info: RepoInfo) -> str:
-    lines = [
-        f"📦 {md_safe(info.full_name)}",
-        f"👤 Owner: {md_safe(info.owner)}",
-        f"📝 {md_safe(truncate(info.description, 300)) if info.description else '(no description)'}",
-        f"⭐ Stars: {info.stars:,}   🍴 Forks: {info.forks:,}",
-        f"💻 Language: {md_safe(info.language) if info.language else 'n/a'}",
-        f"🌿 Default branch: {md_safe(info.default_branch)}",
-        f"🔗 {info.url}",
-    ]
+    """Name, stars and language on one line, then the description. Nothing else is needed to pick a release."""
+    head = [f"📦 {md_safe(info.full_name)}", f"⭐ {format_count(info.stars)}"]
+    if info.language:
+        head.append(md_safe(info.language))
     if info.archived:
-        lines.append("🗄 This repository is archived.")
+        head.append("🗄 archived")
+    lines = [" · ".join(head)]
+    if info.description:
+        lines.append(md_safe(truncate(info.description, 140)))
     return "\n".join(lines)
 
 

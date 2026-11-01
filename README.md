@@ -43,6 +43,17 @@ recovered on the next start.
 
 Rubika's user-account API (rubpy) has no inline buttons or callbacks, so navigation is command based.
 
+## Output is kept short on purpose
+
+* `/get` is **one** message: `name · ⭐ stars · language`, the description, then one line per release
+  (`1. 2.3.14 ⭐ · 2026-10-28`; ⭐ latest, 🧪 pre-release).
+* A release shows its files as `3. arm64-v8a.apk · 31.0 MB`; the part of the name shared by all files is
+  printed once. Signatures and checksums are hidden (`/extras`), source code is `/asset zip` or `/asset tar`,
+  and the changelog is only shown by `/notes`.
+* Each download is **one** status message that is edited in place (`Queued → progress → Packing → Uploading →
+  ✅ sent`). If Rubika refuses edits, progress is skipped rather than flooding the chat; you still get the
+  final line.
+
 ## Behaviour and guarantees
 
 * Only messages **you** typed in **your Saved Messages** that start with `/` are processed; other chats,

@@ -10,7 +10,7 @@ Saved Messages. No website, no dashboard, no separate bot.
 ```
 Saved Messages ──/get 2dust/v2rayNG──▶ service ──GitHub REST API──▶ releases & assets
       ▲                                   │
-      └────── the file (split if big) ◀───┴── streamed to disk, size + SHA-256 verified
+      └──── random-named ZIP (parts if big) ◀──┴── streamed to disk, size + SHA-256 verified
 ```
 
 ## Setup
@@ -21,9 +21,6 @@ cp .env.example .env        # set RUBIKA_PHONE (and optionally GITHUB_TOKEN)
 python main.py login        # once: phone number + SMS code -> session file
 python main.py              # run the service
 ```
-
-Optional: install 7-Zip (`apt install p7zip-full`) so files above 100 MB are split into 95 MB `.7z.001…`
-volumes (the same approach as telegram-to-rubika). Without it a plain binary split is used.
 
 Run it permanently with systemd, `tmux` or Docker. Stop with Ctrl+C / SIGTERM: unfinished jobs are
 recovered on the next start.
@@ -53,6 +50,13 @@ Rubika's user-account API (rubpy) has no inline buttons or callbacks, so navigat
 * Downloads stream to disk (no large RAM use), resume with `Range` after network failures and retry with
   exponential backoff. Size is checked, and SHA-256 is checked against GitHub's `digest` when present
   (the SHA-256 is also written in the file caption).
+* **Every file is delivered as a ZIP, always.** The download is stored on disk under a random name, and
+  inside the ZIP it also has a random name (no extension); the ZIP itself gets another random name
+  (`3fa9…c1.zip`). Captions carry only a job number, never the file name, repository, tag or hash.
+  The mapping back to the real name is in the "delivered" status message and in `/downloads`.
+* Files above 100 MB become several ZIP volumes of 95 MB (`name.zip.001`, `.002`, …) like
+  telegram-to-rubika: put all parts in one folder and open the `.001` file with 7-Zip or WinRAR. They are
+  uploaded one at a time, in order. The ZIP is written straight into volumes (no extra full copy on disk).
 * Limits: `MAX_DOWNLOAD_SIZE_MB` per file (default 2000), `MAX_STORAGE_MB` quota, `MIN_FREE_MB` free disk.
   No Rubika upload limit is assumed: 95 MB parts above 100 MB are the values proven by telegram-to-rubika.
 * Job state lives in SQLite. After a restart, interrupted downloads resume and delivered parts are never

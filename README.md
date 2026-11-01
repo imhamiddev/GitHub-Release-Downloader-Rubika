@@ -34,7 +34,9 @@ recovered on the next start.
 | `/latest [owner/repo]` | latest stable release and its assets |
 | `/release owner/repo tag` | open one release (`/release tag` inside an open repo) |
 | `/open N` · `/page N` · `/filter stable\|all` · `/back` | navigate |
-| `/asset 1 3` | download assets by list number (`zip` / `tar` = source archives) |
+| `/asset 1 3` | download files by list number (`zip` / `tar` = source code) |
+| `/notes` | changelog of the open release (not shown by default) |
+| `/extras` | show / hide signature and checksum files (`.sig`, `.asc`, `.sha256` …) |
 | `/download ID` | download by GitHub asset ID |
 | `/downloads` · `/cancel [ID]` · `/retry ID` | manage jobs |
 | `/status` · `/help` | server status, storage, help |

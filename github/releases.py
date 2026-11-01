@@ -6,7 +6,7 @@ from typing import List, Optional
 from urllib.parse import quote
 
 from errors import InvalidInput, NotFound
-from github.assets import Asset, AssetEntry, build_listing
+from github.assets import Asset, AssetEntry, build_listing, count_extras
 from github.client import GitHubClient
 from github.repository import RepoRef
 
@@ -40,8 +40,13 @@ class Release:
             url=d.get("html_url", ""),
         )
 
-    def listing(self, ref: RepoRef) -> List[AssetEntry]:
-        return build_listing(ref.owner, ref.name, self.tag, self.assets)
+    def listing(self, ref: RepoRef, include_extras: bool = True) -> List[AssetEntry]:
+        return build_listing(ref.owner, ref.name, self.tag, self.assets, include_extras=include_extras)
+
+    @property
+    def extras_count(self) -> int:
+        """How many signature/checksum files the clean listing leaves out."""
+        return count_extras(self.assets)
 
 
 @dataclass

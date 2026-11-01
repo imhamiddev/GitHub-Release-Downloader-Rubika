@@ -11,6 +11,43 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from github.transport import HttpResponse  # noqa: E402
 
 
+def _install_fake_pyzipper():
+    """Stand-in used only when the real pyzipper is not installed (offline CI/sandboxes).
+
+    It writes a normal STORED zip and records the password/bit-size it was given, so the wiring
+    can be tested. Real AES output is covered by tests/test_encryption_real.py when pyzipper exists.
+    """
+    import types
+    import zipfile
+
+    mod = types.ModuleType("pyzipper")
+    mod.IS_FAKE = True
+    mod.ZIP_STORED = zipfile.ZIP_STORED
+    mod.WZ_AES = 99
+    mod.instances = []
+
+    class AESZipFile(zipfile.ZipFile):
+        def __init__(self, file, mode="r", compression=zipfile.ZIP_STORED, encryption=None, **kw):
+            super().__init__(file, mode, compression, **kw)
+            self.password, self.nbits, self.encryption = None, None, encryption
+            mod.instances.append(self)
+
+        def setpassword(self, pwd):
+            self.password = pwd
+
+        def setencryption(self, encryption, nbits=256):
+            self.encryption, self.nbits = encryption, nbits
+
+    mod.AESZipFile = AESZipFile
+    sys.modules["pyzipper"] = mod
+
+
+try:
+    import pyzipper  # noqa: F401
+except ImportError:
+    _install_fake_pyzipper()
+
+
 @pytest.fixture
 def anyio_backend():
     return "asyncio"

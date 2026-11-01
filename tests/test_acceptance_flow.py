@@ -55,7 +55,8 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     transport.add_response(jr([RELEASE]))
     transport.add_response(jr({"id": 9}))
     await say("/get https://github.com/2dust/v2rayNG")
-    info, page = messenger.texts[0], messenger.texts[1]
+    assert len(messenger.texts) == 1  # repo info and releases arrive as ONE message
+    info = page = messenger.texts[0]
     assert "2dust/v2rayNG" in info and "1.2k" in info and "Kotlin" in info
     assert "master" not in info and "Forks" not in info and "github.com" not in info  # noise is gone
     assert "2.0.0" in page and "⭐" in page and "/open N" in page
@@ -63,7 +64,7 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
 
     # /open 1 -> release detail with the complete asset list
     await say("/open 1")
-    detail = messenger.texts[2]
+    detail = messenger.texts[1]
     assert "v2rayNG_2.0.0.apk" in detail and "ID 55" in detail and "source archive" in detail
     assert "**bold**" not in detail  # markdown neutralised
 

@@ -18,13 +18,13 @@ def _repo_or_current(ctx: Context, token: Optional[str]) -> RepoRef:
     return ctx.nav.repo
 
 
-async def show_release_page(ctx: Context, page: int) -> None:
+async def show_release_page(ctx: Context, page: int, header: Optional[str] = None) -> None:
     nav = ctx.nav
     rp = await ctx.releases.get_page(nav.repo, page, ctx.cfg.page_size, nav.include_pre)
     if page > 1 and not rp.items:
         raise InvalidInput(f"There is no page {page}.")
     nav.page, nav.items, nav.has_next, nav.release, nav.listing = page, rp.items, rp.has_next, None, []
-    await ctx.chat.reply(fmt.release_page_text(nav.repo.full_name, rp))
+    await ctx.chat.reply(fmt.release_page_text(nav.repo.full_name, rp, header))
 
 
 async def show_release(ctx: Context, rel: Release) -> None:

@@ -16,8 +16,7 @@ async def cmd_get(ctx: Context, args: List[str]) -> None:
     ref = parse_repo_ref(args[0])
     info = await ctx.repos.get(ref)
     ctx.nav = Nav(repo=ref)
-    await ctx.chat.reply(fmt.repo_info_text(info))
-    await show_release_page(ctx, 1)
+    await show_release_page(ctx, 1, header=fmt.repo_info_text(info))  # one message: info + releases
 
 
 async def show_repo(ctx: Context) -> None:

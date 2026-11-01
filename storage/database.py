@@ -75,6 +75,7 @@ class Job:
     send_inflight: Optional[int]
     split_method: Optional[str]
     alias: Optional[str]
+    password: Optional[str]
     created_at: float
     updated_at: float
 

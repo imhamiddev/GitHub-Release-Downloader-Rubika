@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     parts_sent INTEGER NOT NULL DEFAULT 0,
     send_inflight INTEGER,
     split_method TEXT,
+    alias TEXT,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
@@ -72,6 +73,7 @@ class Job:
     parts_sent: int
     send_inflight: Optional[int]
     split_method: Optional[str]
+    alias: Optional[str]
     created_at: float
     updated_at: float
 
@@ -101,6 +103,9 @@ class Database:
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.executescript(_SCHEMA)
+            cols = {r[1] for r in self._conn.execute("PRAGMA table_info(jobs)")}
+            if "alias" not in cols:  # database created by an older version
+                self._conn.execute("ALTER TABLE jobs ADD COLUMN alias TEXT")
             try:
                 self.path.chmod(0o600)
             except OSError:

@@ -185,6 +185,7 @@ class JobManager:
                 return
             stage = self._entry_stage(job)
             if stage == "download":
+                await self._status(job, fmt.status_text("🕒", job, "Queued"), force=True)
                 async with self._download_sem:
                     job = await self._download_stage(job, cancel)
                 stage = "prepare"

@@ -151,6 +151,13 @@ def unzip_all(parts_bytes, password=None):
         return {n: zf.read(n) for n in zf.namelist()}
 
 
+def caption_password(caption):
+    import re
+
+    m = re.search(r"password: `([A-Za-z0-9]{16})`", caption)
+    return m.group(1) if m else None
+
+
 def is_random_name(name):
     import re
 

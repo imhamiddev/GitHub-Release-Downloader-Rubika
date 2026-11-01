@@ -106,8 +106,9 @@ class Database:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.executescript(_SCHEMA)
             cols = {r[1] for r in self._conn.execute("PRAGMA table_info(jobs)")}
-            if "alias" not in cols:  # database created by an older version
-                self._conn.execute("ALTER TABLE jobs ADD COLUMN alias TEXT")
+            for col in ("alias", "password"):  # database created by an older version
+                if col not in cols:
+                    self._conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT")
             try:
                 self.path.chmod(0o600)
             except OSError:

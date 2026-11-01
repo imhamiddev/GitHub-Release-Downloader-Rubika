@@ -54,7 +54,7 @@ class RubpyMessenger:
         protect_session(self.cfg.session_path)
         log.info("Connected to Rubika as account %s…", self.my_guid[:6])
 
-    async def run_forever(self, on_message: OnMessage) -> None:
+    async def run_forever(self, on_message: OnMessage, on_connected: Optional[Callable[[], Awaitable[None]]] = None) -> None:
         """Receive updates until stopped; reconnect with backoff if the connection drops."""
         self._on_message = on_message
         delay = 2.0
@@ -62,6 +62,8 @@ class RubpyMessenger:
             try:
                 await self.connect()
                 delay = 2.0
+                if on_connected is not None:
+                    asyncio.create_task(on_connected())
                 await self._client.get_updates()  # blocks while connected
                 log.warning("Rubika update loop ended; reconnecting")
             except NotLoggedIn:

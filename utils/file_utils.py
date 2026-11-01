@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import shutil
+import string
 import zipfile
 from pathlib import Path
 from typing import List, Optional
@@ -68,6 +69,12 @@ def atomic_write_text(path: Path, text: str, mode: int = 0o600) -> None:
 def random_name(nbytes: int = 10) -> str:
     """Unguessable, meaningless name (20 hex chars) used for the downloaded file and the archive."""
     return secrets.token_hex(nbytes)
+
+
+def random_password(length: int = 16) -> str:
+    """Random letters+digits only (safe to copy, no characters that Rubika markdown would eat)."""
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 class VolumeWriter:

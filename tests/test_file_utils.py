@@ -1,11 +1,17 @@
 import pytest
 
+import sys
 import threading
-import zipfile
 
 from errors import JobCancelled
 from tests.conftest import is_random_name, unzip_all
-from utils.file_utils import random_name, safe_filename, zip_to_volumes
+from utils.file_utils import (
+    create_encrypted_zip,
+    random_name,
+    random_password,
+    safe_filename,
+    split_into_volumes,
+)
 
 
 @pytest.mark.parametrize("raw,expected", [

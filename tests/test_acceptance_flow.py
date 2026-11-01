@@ -78,7 +78,8 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     assert pw and list(unzip_all([messenger.files[0][2]], pw).values()) == [APK]
     assert pw not in "\n".join(messenger.texts)  # the password goes only in the file caption
     assert "v2rayNG" not in messenger.files[0][0]
-    assert "delivered" in (messenger.edits[-1][1] if messenger.edits else messenger.texts[-1])
+    final = messenger.edits[-1][1] if messenger.edits else messenger.texts[-1]
+    assert "✅" in final and "sent" in final and "archive" not in final and "inside" not in final
 
     await say("/downloads")
     assert "#1" in messenger.texts[-1] and "done" in messenger.texts[-1]

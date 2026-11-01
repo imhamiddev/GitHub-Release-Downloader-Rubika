@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional
 
-from errors import JobCancelled
+from errors import DownloadError, JobCancelled
 
 _BAD_CHARS = re.compile(r"[^\w.\-+() ]", re.UNICODE)
 
@@ -75,6 +75,32 @@ def random_password(length: int = 16) -> str:
     """Random letters+digits only (safe to copy, no characters that Rubika markdown would eat)."""
     alphabet = string.ascii_letters + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def create_encrypted_zip(src: Path, zip_path: Path, arcname: str, password: str, cancel=None) -> Path:
+    """Store ``src`` (no recompression) in an AES-256 encrypted ZIP at ``zip_path``.
+
+    Uses pyzipper (WinZip AES-256, opened by 7-Zip, WinRAR, ZArchiver...). Blocking I/O: call it
+    through ``asyncio.to_thread``. A partial file is removed on any failure.
+    """
+    try:
+        import pyzipper
+    except ImportError:
+        raise DownloadError("pyzipper is not installed. Run: pip install -r requirements.txt") from None
+    if not password:
+        raise DownloadError("internal error: no archive password")
+    if cancel is not None and cancel.is_set():
+        raise JobCancelled("cancelled")
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with pyzipper.AESZipFile(zip_path, "w", compression=pyzipper.ZIP_STORED, encryption=pyzipper.WZ_AES) as zf:
+            zf.setpassword(password.encode("utf-8"))
+            zf.setencryption(pyzipper.WZ_AES, nbits=256)
+            zf.write(src, arcname=arcname)
+    except BaseException:
+        remove_quietly(zip_path)
+        raise
+    return zip_path
 
 
 class VolumeWriter:

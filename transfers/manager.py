@@ -367,7 +367,7 @@ class JobManager:
         await self.db.update_job(job_id, status="failed", error=reason)
         if job:
             await self._status(
-                job, f"❌ #{job_id} {fmt.md_safe(job.name)} failed: {fmt.md_safe(reason)}\nUse /retry {job_id} to try again.", force=True
+                job, fmt.status_text("❌", job, f"{fmt.md_safe(fmt.truncate(reason or "failed", 300))}\n/retry {job_id}"), final=True
             )
 
     async def _on_cancelled(self, job_id: int) -> None:

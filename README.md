@@ -55,7 +55,7 @@ Rubika's user-account API (rubpy) has no inline buttons or callbacks, so navigat
   ZArchiver (Windows Explorer cannot open AES ZIPs). The password is also kept in the job database (needed
   to caption parts after a restart), so protect `data/`. The download is stored on disk under a random name, and
   inside the ZIP it also has a random name (no extension); the ZIP itself gets another random name
-  (`3fa9…c1.zip`). Captions carry only a job number, never the file name, repository, tag or hash.
+  (`3fa9…c1.zip`). Captions carry only a job number and the password, never the file name, repository, tag or hash.
   The mapping back to the real name is in the "delivered" status message and in `/downloads`.
 * Files above 100 MB become several ZIP volumes of 95 MB (`name.zip.001`, `.002`, …) like
   telegram-to-rubika: put all parts in one folder and open the `.001` file with 7-Zip or WinRAR. They are

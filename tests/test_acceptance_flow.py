@@ -65,7 +65,8 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     # /open 1 -> release detail with the complete asset list
     await say("/open 1")
     detail = messenger.texts[1]
-    assert "v2rayNG_2.0.0.apk" in detail and "ID 55" in detail and "source archive" in detail
+    assert "v2rayNG_2.0.0.apk" in detail and "700 B" in detail and "/asset zip" in detail
+    assert "ID 55" not in detail and "changelog" not in detail.lower()  # no ids, no changelog wall
     assert "**bold**" not in detail  # markdown neutralised
 
     # /asset 1 -> the real file is delivered

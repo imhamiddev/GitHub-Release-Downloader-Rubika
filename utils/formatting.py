@@ -134,35 +134,69 @@ def release_page_text(repo: str, page: ReleasePage, header: Optional[str] = None
     return "\n".join(lines)
 
 
-def release_detail_text(repo: str, rel: Release, listing: Sequence[AssetEntry]) -> str:
-    lines = [
-        f"🏷 {md_safe(rel.name or rel.tag)}",
-        f"📦 {md_safe(repo)} @ {md_safe(rel.tag)}",
-        f"📅 {format_date(rel.published_at)} · 👤 {md_safe(rel.author) or 'n/a'}",
-        f"📎 {len(rel.assets)} assets",
-    ]
-    f = flags(rel)
-    if f:
-        lines.append(f)
-    lines += ["", "📝 Changelog:", changelog_excerpt(rel.body), "", "📂 Assets:"]
-    lines += asset_lines(listing)
-    lines += ["", "➡️ /asset 1 3 (by number, several allowed) · /download <asset ID> · /back"]
+def common_prefix(names: Sequence[str]) -> str:
+    """Shared leading part of several file names, cut after a separator (_ - . space).
+
+    ["app_1.2_arm64.apk", "app_1.2_x86.apk"] -> "app_1.2_". Returns "" when it would not help.
+    """
+    if len(names) < 2:
+        return ""
+    pre = names[0]
+    for n in names[1:]:
+        k = 0
+        while k < min(len(pre), len(n)) and pre[k] == n[k]:
+            k += 1
+        pre = pre[:k]
+    cut = max(pre.rfind(c) for c in "_-. ") + 1
+    pre = pre[:cut]
+    return pre if len(pre) >= 5 and all(len(n) > len(pre) for n in names) else ""
+
+
+def asset_lines(listing: Sequence[AssetEntry], prefix: str = "") -> List[str]:
+    """``3. arm64-v8a.apk · 31.0 MB`` per file. Source archives are summarised elsewhere."""
+    out = []
+    for e in listing:
+        if e.is_source:
+            continue
+        name = e.name[len(prefix):] if prefix and e.name.startswith(prefix) else e.name
+        extra = "" if e.available else " · ⛔ unavailable"
+        out.append(f"{e.index}. {md_safe(name)} · {format_size(e.size)}{extra}")
+    return out
+
+
+def release_detail_text(
+    repo: str, rel: Release, listing: Sequence[AssetEntry], hidden: int = 0, extras_shown: bool = False
+) -> str:
+    """Title, files with sizes, and the few commands that make sense next. No changelog (see /notes)."""
+    title = f"🏷 {md_safe(rel.tag)}"
+    if rel.name and rel.name != rel.tag:
+        title += f" — {md_safe(truncate(rel.name, 60))}"
+    icons = flags(rel)
+    if icons:
+        title += f" {icons}"
+    files = [e for e in listing if not e.is_source]
+    prefix = common_prefix([e.name for e in files])
+    lines = [title, f"📦 {md_safe(repo)} · {format_day(rel.published_at)}", ""]
+    if files:
+        lines.append("📂 Files" + (f" · {md_safe(prefix)}…" if prefix else ""))
+        lines += asset_lines(listing, prefix)
+    else:
+        lines.append("📂 No uploaded files in this release.")
+    if any(e.key == "zipball" for e in listing):
+        lines.append("📚 Source code: /asset zip · /asset tar")
+    if hidden:
+        lines.append(f"➕ {hidden} signature/checksum file(s) hidden — /extras")
+    elif extras_shown and rel.extras_count:
+        lines.append("➖ showing signatures/checksums — /extras to hide")
+    lines += ["", "➡️ /asset 1 3 · /notes · /back"]
     return "\n".join(lines)
 
 
-def asset_lines(listing: Sequence[AssetEntry]) -> List[str]:
-    out = []
-    for e in listing:
-        status = "✅ available" if e.available else "⛔ not available"
-        kind = e.content_type or "unknown type"
-        if e.is_source:
-            out.append(f"{e.index}. {md_safe(e.name)} — source archive · {kind} · {status}")
-        else:
-            out.append(
-                f"{e.index}. {md_safe(e.name)}\n"
-                f"   {format_size(e.size)} · {md_safe(kind)} · ⬇️ {e.download_count or 0} · ID {e.key} · {status}"
-            )
-    return out
+def release_notes_text(rel: Release, limit: int = 1500) -> str:
+    title = f"📝 {md_safe(rel.tag)} — changelog"
+    if not (rel.body or "").strip():
+        return f"{title}\n\nThis release has no changelog."
+    return f"{title}\n\n{changelog_excerpt(rel.body, limit)}"
 
 
 JOB_ICONS = {

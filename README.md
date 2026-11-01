@@ -61,8 +61,7 @@ Rubika's user-account API (rubpy) has no inline buttons or callbacks, so navigat
 * Only `github.com` / GitHub-owned hosts are ever contacted; redirects are re-validated hop by hop and the
   GitHub token is never sent to the storage host. Arbitrary URLs are rejected.
 * Downloads stream to disk (no large RAM use), resume with `Range` after network failures and retry with
-  exponential backoff. Size is checked, and SHA-256 is checked against GitHub's `digest` when present
-  (the SHA-256 is also written in the file caption).
+  exponential backoff. Size is checked, and SHA-256 is checked against GitHub's `digest` when present.
 * **Every file is delivered as an AES-256 encrypted ZIP, always**, with a **new random 16-character password
   per file** that is written in the caption of every part (`🔑 password: …`). Open it with 7-Zip, WinRAR or
   ZArchiver (Windows Explorer cannot open AES ZIPs). The password is also kept in the job database (needed

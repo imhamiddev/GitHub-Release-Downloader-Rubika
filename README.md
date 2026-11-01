@@ -50,7 +50,10 @@ Rubika's user-account API (rubpy) has no inline buttons or callbacks, so navigat
 * Downloads stream to disk (no large RAM use), resume with `Range` after network failures and retry with
   exponential backoff. Size is checked, and SHA-256 is checked against GitHub's `digest` when present
   (the SHA-256 is also written in the file caption).
-* **Every file is delivered as a ZIP, always.** The download is stored on disk under a random name, and
+* **Every file is delivered as an AES-256 encrypted ZIP, always**, with a **new random 16-character password
+  per file** that is written in the caption of every part (`🔑 password: …`). Open it with 7-Zip, WinRAR or
+  ZArchiver (Windows Explorer cannot open AES ZIPs). The password is also kept in the job database (needed
+  to caption parts after a restart), so protect `data/`. The download is stored on disk under a random name, and
   inside the ZIP it also has a random name (no extension); the ZIP itself gets another random name
   (`3fa9…c1.zip`). Captions carry only a job number, never the file name, repository, tag or hash.
   The mapping back to the real name is in the "delivered" status message and in `/downloads`.

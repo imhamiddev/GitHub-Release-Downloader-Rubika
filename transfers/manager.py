@@ -300,9 +300,8 @@ class JobManager:
             path = Path(parts[index]["path"])
             if not path.exists():
                 raise SendError(f"part {index + 1} is missing on disk; use /retry")
-            await self._status(
-                job, f"📤 #{job.id} {fmt.md_safe(job.name)}\nUploading part {index + 1}/{total}…", force=True
-            )
+            what = f"Uploading part {index + 1}/{total}…" if total > 1 else "Uploading…"
+            await self._status(job, fmt.status_text("📤", job, what), force=True)
             # Mark the part as in flight. If we crash now we cannot know whether it arrived, so
             # recovery asks the user instead of silently risking a duplicate file.
             await self.db.update_job(job.id, send_inflight=index)

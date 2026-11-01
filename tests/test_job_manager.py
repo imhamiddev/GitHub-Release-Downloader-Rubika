@@ -12,7 +12,9 @@ from github.repository import RepoRef
 from rubika.saved_messages import SavedMessages
 from storage.cache import TTLCache
 from storage.database import Database
-from tests.conftest import FakeStream, no_sleep
+from pathlib import Path
+
+from tests.conftest import FakeStream, is_random_name, no_sleep, unzip_all
 from transfers.downloader import Downloader
 from transfers.manager import JobManager
 from transfers.recovery import recover_jobs
@@ -39,7 +41,7 @@ async def build(tmp_path, transport, messenger, **over):
     await db.init()
     gh = GitHubClient(transport, None, TTLCache(1), sleep=no_sleep)
     mgr = JobManager(c, db, Downloader(gh, 1, 0.0, no_sleep), messenger, SavedMessages(messenger),
-                     None, sleep=no_sleep)
+                     sleep=no_sleep)
     return c, db, mgr
 
 
@@ -57,8 +59,15 @@ async def test_full_flow_delivers_original_file_and_cleans_up(tmp_path, transpor
     await mgr.wait(job.id)
     j = await db.get_job(job.id)
     assert j.status == "done"
-    assert len(messenger.files) == 1 and messenger.files[0][2] == DATA
-    assert hashlib.sha256(DATA).hexdigest() in messenger.files[0][1]
+    assert len(messenger.files) == 1
+    path, caption, blob = messenger.files[0]
+    inner = unzip_all([blob])  # always a ZIP, and the original bytes are inside
+    assert list(inner.values()) == [DATA]
+    assert Path(path).name.endswith(".zip") and is_random_name(Path(path).name)
+    (member,) = inner
+    assert is_random_name(member) and "app" not in member and "apk" not in member
+    assert j.alias == member
+    assert "app" not in caption and "o/r" not in caption and "v1" not in caption and hashlib.sha256(DATA).hexdigest() not in caption
     assert not (c.download_dir / f"job-{job.id}").exists()
 
 
@@ -109,9 +118,13 @@ async def test_large_file_is_split_and_every_part_sent_in_order(tmp_path, transp
     job, _ = await mgr.submit(REF, "v1", entry(size=len(big)))
     await mgr.wait(job.id)
     j = await db.get_job(job.id)
-    assert j.status == "done" and j.split_method == "raw"
+    assert j.status == "done" and j.split_method == "zip-volumes"
     assert len(messenger.files) == 3
-    assert b"".join(f[2] for f in messenger.files) == big
+    names = [Path(f[0]).name for f in messenger.files]
+    base = names[0][:-4]
+    assert names == [f"{base}.001", f"{base}.002", f"{base}.003"] and all(is_random_name(n) for n in names)
+    assert list(unzip_all([f[2] for f in messenger.files]).values()) == [big]  # volumes join into one ZIP
+    assert all(len(f[2]) <= 1024 * 1024 for f in messenger.files)
     assert "part 1/3" in messenger.files[0][1] and "part 3/3" in messenger.files[2][1]
 
 
@@ -139,6 +152,7 @@ async def test_upload_gives_up_after_max_retries(tmp_path, transport, messenger)
     await mgr.retry(job.id)
     await mgr.wait(job.id)
     assert (await db.get_job(job.id)).status == "done" and len(messenger.files) == 1
+    assert list(unzip_all([messenger.files[0][2]]).values()) == [DATA]
 
 
 @pytest.mark.anyio
@@ -167,7 +181,7 @@ async def test_recovery_resumes_without_resending_delivered_parts(tmp_path, tran
     report = await recover_jobs(db, mgr)
     assert report.resumed == [job.id]
     await mgr.wait(job.id)
-    assert [f[2] for f in messenger.files] == [b"BBB"]
+    assert [f[2] for f in messenger.files] == [b"BBB"]  # recovery sends what is left, as-is
     assert (await db.get_job(job.id)).status == "done"
 
 
@@ -196,3 +210,4 @@ async def test_recovery_restarts_interrupted_download(tmp_path, transport, messe
     await recover_jobs(db, mgr)
     await mgr.wait(job.id)
     assert (await db.get_job(job.id)).status == "done" and len(messenger.files) == 1
+    assert list(unzip_all([messenger.files[0][2]]).values()) == [DATA]

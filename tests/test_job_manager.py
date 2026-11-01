@@ -241,3 +241,18 @@ async def test_password_survives_restart_and_is_reused(tmp_path, transport, mess
     await recover_jobs(db, mgr)
     await mgr.wait(job.id)
     assert caption_password(messenger.files[0][1]) == "FixedPassword12A"
+
+
+@pytest.mark.anyio
+async def test_refused_edits_do_not_flood_the_chat(tmp_path, transport, messenger):
+    async def refuse(message_id, text):
+        raise RuntimeError("edit not allowed")
+
+    messenger.edit_text = refuse
+    _, db, mgr = await build(tmp_path, transport, messenger)
+    transport.add_stream(stream())
+    job, _ = await mgr.submit(REF, "v1", entry())
+    await mgr.wait(job.id)
+    # first status + the final result at most; never one message per progress step
+    assert len(messenger.texts) <= 2
+    assert "✅" in messenger.texts[-1]

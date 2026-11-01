@@ -58,7 +58,8 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     info, page = messenger.texts[0], messenger.texts[1]
     assert "2dust/v2rayNG" in info and "1.2k" in info and "Kotlin" in info
     assert "master" not in info and "Forks" not in info and "github.com" not in info  # noise is gone
-    assert "2.0.0" in page and "latest stable" in page and "/open N" in page
+    assert "2.0.0" in page and "⭐" in page and "/open N" in page
+    assert "👤" not in page and "assets" not in page and "UTC" not in page  # author, asset count, clock time
 
     # /open 1 -> release detail with the complete asset list
     await say("/open 1")

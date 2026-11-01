@@ -82,14 +82,15 @@ def changelog_excerpt(body: str, limit: int = 700) -> str:
 
 
 def flags(rel: Release) -> str:
+    """Icons only (the legend is printed once under the list)."""
     out = []
     if rel.is_latest:
-        out.append("⭐ latest stable")
+        out.append("⭐")
     if rel.prerelease:
-        out.append("🧪 pre-release")
+        out.append("🧪")
     if rel.draft:
-        out.append("📝 draft")
-    return " · ".join(out)
+        out.append("📝")
+    return " ".join(out)
 
 
 def repo_info_text(info: RepoInfo) -> str:
@@ -105,27 +106,31 @@ def repo_info_text(info: RepoInfo) -> str:
     return "\n".join(lines)
 
 
-def release_page_text(repo: str, page: ReleasePage) -> str:
-    kind = "all releases" if page.include_prereleases else "stable only"
+def release_page_text(repo: str, page: ReleasePage, header: Optional[str] = None) -> str:
+    """One line per release: number, tag, flags, date. ``header`` is the repo info when sent by /get."""
+    kind = "all" if page.include_prereleases else "stable only"
+    title = f"📋 Releases · {kind} · page {page.page}" if header else f"📋 {md_safe(repo)} · releases · {kind} · page {page.page}"
+    top = [header, ""] if header else []
     if not page.items:
-        return f"📋 {repo} — no releases on page {page.page} ({kind})."
-    lines = [f"📋 Releases of {md_safe(repo)} — page {page.page} ({kind})", ""]
+        return "\n".join(top + [f"{title}\nNothing here."])
+    lines = top + [title, ""]
+    seen_flags = set()
     for i, rel in enumerate(page.items, 1):
-        title = md_safe(rel.name) if rel.name and rel.name != rel.tag else ""
-        head = f"{i}. {md_safe(rel.tag)}" + (f" — {title}" if title else "")
-        lines.append(head)
-        meta = f"   📅 {format_date(rel.published_at)} · 👤 {md_safe(rel.author) or 'n/a'} · 📎 {len(rel.assets)} assets"
-        lines.append(meta)
-        f = flags(rel)
-        if f:
-            lines.append(f"   {f}")
+        name = md_safe(truncate(rel.name, 40)) if rel.name and rel.name != rel.tag else ""
+        label = md_safe(rel.tag) + (f" — {name}" if name else "")
+        icons = flags(rel)
+        seen_flags.update(icons.split())
+        lines.append(f"{i}. {label}" + (f" {icons}" if icons else "") + f" · {format_day(rel.published_at)}")
+    legend = [txt for icon, txt in (("⭐", "⭐ latest"), ("🧪", "🧪 pre-release"), ("📝", "📝 draft")) if icon in seen_flags]
+    if legend:
+        lines += ["", " · ".join(legend)]
     nav = ["/open N"]
     if page.has_next:
         nav.append(f"/page {page.page + 1}")
     if page.page > 1:
         nav.append(f"/page {page.page - 1}")
-    nav.append("/filter stable|all")
-    lines += ["", "➡️ " + "  ".join(nav)]
+    nav.append("/filter stable" if page.include_prereleases else "/filter all")
+    lines += ["", "➡️ " + " · ".join(nav)]
     return "\n".join(lines)
 
 

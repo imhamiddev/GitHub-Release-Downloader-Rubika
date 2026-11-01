@@ -256,13 +256,16 @@ class JobManager:
         self._check_capacity(size, 1.05)  # the original is already on disk; the ZIP needs one more copy
         parts_dir = self.job_dir(job.id) / "zip"
         remove_quietly(parts_dir)  # leftovers of an interrupted attempt
-        arcname = job.alias or src.name
-        paths = await asyncio.to_thread(
-            zip_to_volumes, src, parts_dir, random_name(), arcname,
-            self.cfg.part_size_mb * 1024 * 1024 if split else None, cancel,
-        )
+        zip_path = parts_dir / f"{random_name()}.zip"
+        await asyncio.to_thread(create_encrypted_zip, src, zip_path, job.alias or src.name, password, cancel)
+        if cancel.is_set():
+            raise JobCancelled("cancelled")
+        if split:
+            remove_quietly(src)  # the ZIP now holds everything: keeps peak disk use at ~2x the file
+            paths = await asyncio.to_thread(split_into_volumes, zip_path, self.cfg.part_size_mb * 1024 * 1024, cancel)
+        else:
+            paths = [zip_path]
         parts = [{"path": str(p), "size": p.stat().st_size} for p in paths]
-        # Persist the part list BEFORE deleting the original, so a crash loses nothing.
         await self.db.update_job(
             job.id, parts_json=json.dumps(parts), parts_sent=0, send_inflight=None,
             split_method="zip-volumes" if len(parts) > 1 else "zip", status="sending",

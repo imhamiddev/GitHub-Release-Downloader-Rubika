@@ -14,7 +14,7 @@ from rubika.message_listener import IncomingMessage
 from rubika.saved_messages import SavedMessages
 from storage.cache import TTLCache
 from storage.database import Database
-from tests.conftest import FakeStream, no_sleep, unzip_all
+from tests.conftest import FakeStream, caption_password, no_sleep, unzip_all
 from transfers.downloader import Downloader
 from transfers.manager import JobManager
 
@@ -70,7 +70,9 @@ async def test_get_browse_open_asset_download(tmp_path, transport, messenger):
     transport.add_stream(FakeStream(200, {"content-length": str(len(APK))}, [APK]))
     await say("/asset 1")
     await jobs.wait(1)
-    assert list(unzip_all([messenger.files[0][2]]).values()) == [APK]
+    pw = caption_password(messenger.files[0][1])
+    assert pw and list(unzip_all([messenger.files[0][2]], pw).values()) == [APK]
+    assert pw not in "\n".join(messenger.texts)  # the password goes only in the file caption
     assert "v2rayNG" not in messenger.files[0][0]
     assert "delivered" in (messenger.edits[-1][1] if messenger.edits else messenger.texts[-1])
 

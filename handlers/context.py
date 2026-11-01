@@ -22,6 +22,7 @@ class Nav:
     repo: Optional[RepoRef] = None
     page: int = 1
     include_pre: bool = True
+    show_extras: bool = False  # signatures / checksums are hidden unless /extras turns them on
     items: List[Release] = field(default_factory=list)
     has_next: bool = False
     release: Optional[Release] = None

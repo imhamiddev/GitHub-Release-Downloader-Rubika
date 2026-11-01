@@ -230,11 +230,11 @@ class JobManager:
         dest = self.job_dir(job.id) / alias
         await self.db.update_job(job.id, status="downloading", alias=alias)
         job = await self.db.get_job(job.id)
-        await self._status(job, f"⬇️ #{job.id} {fmt.md_safe(job.name)}\nStarting download…", force=True)
+        await self._status(job, fmt.status_text("⬇️", job, "Starting…"), force=True)
 
         async def progress(done: int, total: Optional[int]) -> None:
             await self.db.update_job(job.id, bytes_done=done)
-            await self._status(job, f"⬇️ #{job.id} {fmt.md_safe(job.name)}\n{fmt.progress_bar(done, total)}")
+            await self._status(job, fmt.status_text("⬇️", job, fmt.progress_bar(done, total)))
 
         result = await self.downloader.download(
             job.url,

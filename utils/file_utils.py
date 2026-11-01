@@ -6,7 +6,6 @@ import re
 import secrets
 import shutil
 import string
-import zipfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -137,81 +136,3 @@ def split_into_volumes(zip_path: Path, part_bytes: int, cancel=None, chunk: int 
         raise
     remove_quietly(zip_path)
     return volumes
-class VolumeWriter:
-    """Write-only, non-seekable stream that rolls over into ``<base>.001``, ``.002`` ... volumes.
-
-    Handing it to ``zipfile.ZipFile`` produces a normal ZIP that is already cut into raw
-    volumes, which 7-Zip / WinRAR open from the ``.001`` file. Peak disk use is the volumes only.
-    """
-
-    def __init__(self, base: Path, part_bytes: Optional[int], cancel=None):
-        self.base, self.part_bytes, self._cancel = base, part_bytes, cancel
-        self.paths: List[Path] = []
-        self._fh = None
-        self._in_part = 0
-        self._pos = 0
-
-    def _open_next(self) -> None:
-        if self._fh:
-            self._fh.close()
-        path = self.base if self.part_bytes is None else self.base.with_name(f"{self.base.name}.{len(self.paths) + 1:03d}")
-        self._fh = open(path, "wb")
-        self.paths.append(path)
-        self._in_part = 0
-
-    def write(self, data) -> int:
-        if self._cancel is not None and self._cancel.is_set():
-            raise JobCancelled("cancelled")
-        view = memoryview(data)
-        total = len(view)
-        offset = 0
-        while offset < total:
-            if self._fh is None or (self.part_bytes is not None and self._in_part >= self.part_bytes):
-                self._open_next()
-            room = (total - offset) if self.part_bytes is None else min(total - offset, self.part_bytes - self._in_part)
-            self._fh.write(view[offset : offset + room])
-            self._in_part += room
-            offset += room
-        self._pos += total
-        return total
-
-    def tell(self) -> int:
-        return self._pos
-
-    def flush(self) -> None:
-        if self._fh:
-            self._fh.flush()
-
-    def close(self) -> None:
-        if self._fh:
-            self._fh.flush()
-            os.fsync(self._fh.fileno())
-            self._fh.close()
-            self._fh = None
-
-
-def zip_to_volumes(
-    src: Path, out_dir: Path, zip_base: str, arcname: str, part_bytes: Optional[int], cancel=None
-) -> List[Path]:
-    """Store ``src`` (no recompression) in a ZIP named ``<zip_base>.zip``, split into volumes if asked.
-
-    Returns the files to upload, in order: ``[x.zip]`` or ``[x.zip.001, x.zip.002, ...]``.
-    Runs blocking I/O: call it through ``asyncio.to_thread``.
-    """
-    out_dir.mkdir(parents=True, exist_ok=True)
-    base = out_dir / f"{zip_base}.zip"
-    writer = VolumeWriter(base, part_bytes, cancel)
-    try:
-        with zipfile.ZipFile(writer, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as zf:
-            zf.write(src, arcname=arcname, compress_type=zipfile.ZIP_STORED)
-        writer.close()
-    except BaseException:
-        writer.close()
-        for p in writer.paths:
-            remove_quietly(p)
-        raise
-    paths = writer.paths
-    if part_bytes is not None and len(paths) == 1:  # fit in one volume: plain .zip
-        paths[0].rename(base)
-        paths = [base]
-    return paths

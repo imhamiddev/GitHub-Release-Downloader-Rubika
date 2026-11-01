@@ -244,6 +244,9 @@ class JobManager:
             raise DownloadError("the downloaded file disappeared from disk; use /retry")
         size = src.stat().st_size
         split = size > self.cfg.split_threshold_mb * 1024 * 1024
+        password = job.password or random_password()
+        if not job.password:
+            await self.db.update_job(job.id, password=password)  # keep it for captions after a restart
         await self._status(
             job,
             f"🗜 #{job.id} {fmt.md_safe(job.name)}\nCreating {'a multi-part ZIP (' + str(self.cfg.part_size_mb) + ' MB parts)' if split else 'a ZIP'}…",

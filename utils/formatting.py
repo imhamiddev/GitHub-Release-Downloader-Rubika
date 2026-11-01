@@ -186,7 +186,8 @@ def help_text() -> str:
         "/cancel [ID] — cancel one download (no ID: everything active)\n"
         "/retry ID — resume a failed download\n\n"
         "Other\n"
-        "/status — server status and storage · /help"
+        "/status — server status and storage · /help\n\n"
+        "🗜 Every file arrives as a ZIP with a random name (several parts if big)."
     )
 
 

@@ -345,7 +345,7 @@ class JobManager:
                     raise SendError(f"upload failed after {self.cfg.max_retries} retries: {type(exc).__name__}") from None
                 delay = min(5 * 2 ** (attempt - 1), 120)
                 log.warning("upload of job %s part %s failed (%s); retry %s in %ss", job.id, index + 1, type(exc).__name__, attempt, delay)
-                await self._status(job, f"⚠️ #{job.id} upload error, retry {attempt}/{self.cfg.max_retries} in {delay}s", force=True)
+                await self._status(job, fmt.status_text("⚠️", job, f"Upload failed, retry {attempt}/{self.cfg.max_retries} in {delay}s"), force=True)
                 await self._sleep(delay)
             finally:
                 if not upload.done():

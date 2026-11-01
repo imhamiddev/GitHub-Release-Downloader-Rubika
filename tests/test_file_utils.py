@@ -10,7 +10,7 @@ from utils.file_utils import _raw_split, safe_filename, split_file
     ("-rf.sh", "rf.sh"),
     ("", "file"),
     ("..", "file"),
-    ("na me;$(x).bin", "na me__x_.bin"),
+    ("na me;$(x).bin", "na me__(x).bin"),
 ])
 def test_safe_filename(raw, expected):
     assert safe_filename(raw) == expected

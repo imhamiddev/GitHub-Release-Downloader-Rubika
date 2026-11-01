@@ -53,6 +53,23 @@ class AssetEntry:
         return None if self.is_source else int(self.key)
 
 
+_EXTRA_SUFFIXES = (
+    ".sig", ".asc", ".minisig", ".pem", ".sha1", ".sha256", ".sha256sum", ".sha512", ".md5",
+    ".sbom", ".spdx", ".spdx.json", ".cdx.json", ".intoto.jsonl", ".sigstore", ".sigstore.json",
+)
+_EXTRA_NAMES = ("sha256sums", "sha512sums", "sha1sums", "md5sums", "checksums.txt", "checksums.sha256")
+
+
+def is_extra_asset(name: str) -> bool:
+    """True for signatures, checksums and SBOMs: rarely wanted, so hidden from the default listing."""
+    low = (name or "").lower()
+    return low.endswith(_EXTRA_SUFFIXES) or low in _EXTRA_NAMES
+
+
+def count_extras(assets: Sequence["Asset"]) -> int:
+    return sum(1 for a in assets if is_extra_asset(a.name))
+
+
 def parse_digest(digest: Optional[str]) -> Optional[str]:
     """Return the lower-case hex SHA-256 from GitHub's ``sha256:<hex>`` digest, else None."""
     if not digest or not digest.lower().startswith("sha256:"):
@@ -63,9 +80,18 @@ def parse_digest(digest: Optional[str]) -> Optional[str]:
     return None
 
 
-def build_listing(owner: str, repo: str, tag: str, assets: Sequence[Asset], include_source: bool = True) -> List[AssetEntry]:
+def build_listing(
+    owner: str,
+    repo: str,
+    tag: str,
+    assets: Sequence[Asset],
+    include_source: bool = True,
+    include_extras: bool = True,
+) -> List[AssetEntry]:
     entries: List[AssetEntry] = []
     for a in assets:
+        if not include_extras and is_extra_asset(a.name):
+            continue
         entries.append(
             AssetEntry(
                 index=len(entries) + 1,

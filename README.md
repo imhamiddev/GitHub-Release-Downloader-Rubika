@@ -59,7 +59,7 @@ Rubika's user-account API (rubpy) has no inline buttons or callbacks, so navigat
   The mapping back to the real name is in the "delivered" status message and in `/downloads`.
 * Files above 100 MB become several ZIP volumes of 95 MB (`name.zip.001`, `.002`, …) like
   telegram-to-rubika: put all parts in one folder and open the `.001` file with 7-Zip or WinRAR. They are
-  uploaded one at a time, in order. The ZIP is written straight into volumes (no extra full copy on disk).
+  uploaded one at a time, in order. The original is deleted as soon as the ZIP exists, so peak disk use stays near 2x the file size.
 * Limits: `MAX_DOWNLOAD_SIZE_MB` per file (default 2000), `MAX_STORAGE_MB` quota, `MIN_FREE_MB` free disk.
   No Rubika upload limit is assumed: 95 MB parts above 100 MB are the values proven by telegram-to-rubika.
 * Job state lives in SQLite. After a restart, interrupted downloads resume and delivered parts are never

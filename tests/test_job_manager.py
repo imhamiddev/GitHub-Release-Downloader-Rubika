@@ -61,7 +61,10 @@ async def test_full_flow_delivers_original_file_and_cleans_up(tmp_path, transpor
     assert j.status == "done"
     assert len(messenger.files) == 1
     path, caption, blob = messenger.files[0]
-    inner = unzip_all([blob])  # always a ZIP, and the original bytes are inside
+    pw = caption_password(caption)
+    assert pw and len(pw) == 16  # random password sent to Rubika in the caption
+    assert (await db.get_job(job.id)).password == pw
+    inner = unzip_all([blob], pw)  # always a ZIP, and the original bytes are inside
     assert list(inner.values()) == [DATA]
     assert Path(path).name.endswith(".zip") and is_random_name(Path(path).name)
     (member,) = inner
@@ -123,7 +126,9 @@ async def test_large_file_is_split_and_every_part_sent_in_order(tmp_path, transp
     names = [Path(f[0]).name for f in messenger.files]
     base = names[0][:-4]
     assert names == [f"{base}.001", f"{base}.002", f"{base}.003"] and all(is_random_name(n) for n in names)
-    assert list(unzip_all([f[2] for f in messenger.files]).values()) == [big]  # volumes join into one ZIP
+    pws = {caption_password(f[1]) for f in messenger.files}
+    assert len(pws) == 1 and None not in pws  # same password in every part's caption
+    assert list(unzip_all([f[2] for f in messenger.files], pws.pop()).values()) == [big]  # volumes join into one ZIP
     assert all(len(f[2]) <= 1024 * 1024 for f in messenger.files)
     assert "part 1/3" in messenger.files[0][1] and "part 3/3" in messenger.files[2][1]
 
@@ -152,7 +157,7 @@ async def test_upload_gives_up_after_max_retries(tmp_path, transport, messenger)
     await mgr.retry(job.id)
     await mgr.wait(job.id)
     assert (await db.get_job(job.id)).status == "done" and len(messenger.files) == 1
-    assert list(unzip_all([messenger.files[0][2]]).values()) == [DATA]
+    assert list(unzip_all([messenger.files[0][2]], caption_password(messenger.files[0][1])).values()) == [DATA]
 
 
 @pytest.mark.anyio

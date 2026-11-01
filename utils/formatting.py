@@ -223,6 +223,12 @@ def job_line(job) -> str:
     return line
 
 
+def status_text(icon: str, job, detail: Optional[str] = None) -> str:
+    """Status message of a download: ``<icon> #id name`` and, optionally, one detail line."""
+    head = f"{icon} #{job.id} {md_safe(job.name)}"
+    return f"{head}\n{detail}" if detail else head
+
+
 def help_text() -> str:
     return (
         "📖 Commands\n\n"
